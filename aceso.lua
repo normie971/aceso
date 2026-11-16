@@ -3469,10 +3469,28 @@ local Skins = (function()
 			end
 		end
 	end
+	local function DisplayModel(Weapon)
+		if Weapon == "Knife" then
+			local K = ReplicatedStorage:FindFirstChild("Knives")
+			return K and K:FindFirstChild("None")
+		end
+		local W = ReplicatedStorage:FindFirstChild("Wraps")
+		if not W then return nil end
+		local Key = Weapon:lower():gsub("[^%w]", "")
+		for _, G in ipairs(W:GetChildren()) do
+			local N = G.Name:lower():gsub("[^%w]", "")
+			if N ~= "" and (N == Key or Key:sub(1, #N) == N or N:sub(1, #Key) == Key) then
+				return G:FindFirstChild("None")
+			end
+		end
+	end
 	local function CloneFor(Weapon)
 		local Src, IsWrap = SourceFor(Weapon)
+		local Disp = DisplayModel(Weapon)
+		if Disp then Src, IsWrap = Disp, false end
 		if not Src then return nil end
 		local M = Instance.new("Model")
+		if Disp then M:SetAttribute("Display", true) end
 		pcall(function() local G = GripFor(Weapon, Src); if G then M:SetAttribute("Grip", G) end end)
 		if Src:IsA("Tool") or (Src:IsA("Model") and Src:FindFirstChild("Handle")) then
 			for _, C in ipairs(Src:GetChildren()) do
@@ -3529,6 +3547,18 @@ local Skins = (function()
 			Cam.CFrame = CF * CFrame.new(0, 0, self.Dist)
 		end
 		function O:Frame(M)
+			if M:GetAttribute("Display") then
+				local P = M:FindFirstChild("Handle", true)
+				if not (P and P:IsA("BasePart")) then P = M:FindFirstChildWhichIsA("BasePart", true) end
+				if P then
+					Cam.FieldOfView = 70
+					local Pos = P.CFrame.Position
+					Cam.CFrame = CFrame.new(Pos + v3(1.25, 1.25, 1.25) * P.Size.Magnitude * 0.4, Pos)
+					self.Center, self.Size = Pos, P.Size.Magnitude
+					return
+				end
+			end
+			Cam.FieldOfView = 40
 			local Pts, Big, BigV = {}, nil, 0
 			for _, D in ipairs(M:GetDescendants()) do
 				if D:IsA("BasePart") and D.Transparency < 0.95 and D.Size.Magnitude < 12 then
