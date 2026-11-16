@@ -3517,46 +3517,53 @@ local Skins = (function()
 			Cam.CFrame = CF * CFrame.new(0, 0, self.Dist)
 		end
 		function O:Frame(M)
-			local Lo, Hi
-			local Pts = {}
+			local Pts, Big, BigV = {}, nil, 0
 			for _, D in ipairs(M:GetDescendants()) do
 				if D:IsA("BasePart") and D.Transparency < 0.95 and D.Size.Magnitude < 12 then
 					local H = D.Size / 2
-					local C0 = D.CFrame
+					local V = D.Size.X * D.Size.Y * D.Size.Z
+					if V > BigV then Big, BigV = D, V end
 					for _, X in ipairs({ -1, 1 }) do for _, Y in ipairs({ -1, 1 }) do for _, Z in ipairs({ -1, 1 }) do
-						local Pt = C0:PointToWorldSpace(v3(H.X * X, H.Y * Y, H.Z * Z))
-						Pts[#Pts + 1] = Pt
-						Lo = Lo and v3(math.min(Lo.X, Pt.X), math.min(Lo.Y, Pt.Y), math.min(Lo.Z, Pt.Z)) or Pt
-						Hi = Hi and v3(math.max(Hi.X, Pt.X), math.max(Hi.Y, Pt.Y), math.max(Hi.Z, Pt.Z)) or Pt
+						Pts[#Pts + 1] = D.CFrame:PointToWorldSpace(v3(H.X * X, H.Y * Y, H.Z * Z))
 					end end end
 				end
 			end
-			if not Lo then local CF, Sz = M:GetBoundingBox(); Lo, Hi = CF.Position - Sz / 2, CF.Position + Sz / 2 end
-			self.Center = (Lo + Hi) / 2
-			self.Size = math.max((Hi - Lo).Magnitude, 0.5)
-			local Ext = Hi - Lo
-			local Axis = Ext.X >= Ext.Z and v3(1, 0, 0) or v3(0, 0, 1)
-			local Tip
+			if not Big then
+				local CF, Sz = M:GetBoundingBox()
+				self.Center, self.Size = CF.Position, math.max(Sz.Magnitude, 0.5)
+				self:Place()
+				return
+			end
+			local Ax = { { Big.CFrame.RightVector, Big.Size.X }, { Big.CFrame.UpVector, Big.Size.Y }, { Big.CFrame.ZVector, Big.Size.Z } }
+			table.sort(Ax, function(A, B) return A[2] > B[2] end)
+			local Long = Ax[1][1]
+			local Up = math.abs(Ax[2][1]:Dot(v3(0, 1, 0))) >= math.abs(Ax[3][1]:Dot(v3(0, 1, 0))) and Ax[2][1] or Ax[3][1]
+			if Up:Dot(v3(0, 1, 0)) < 0 then Up = -Up end
+			local Mid = v3()
+			for _, P in ipairs(Pts) do Mid = Mid + P end
+			Mid = Mid / #Pts
+			local L0, L1, U0, U1 = math.huge, -math.huge, math.huge, -math.huge
+			local A0, A1, B0, B1 = math.huge, -math.huge, math.huge, -math.huge
+			for _, P in ipairs(Pts) do
+				local S, Y = (P - Mid):Dot(Long), (P - Mid):Dot(Up)
+				L0, L1, U0, U1 = math.min(L0, S), math.max(L1, S), math.min(U0, Y), math.max(U1, Y)
+				if S >= 0 then A0, A1 = math.min(A0, Y), math.max(A1, Y) else B0, B1 = math.min(B0, Y), math.max(B1, Y) end
+			end
+			local Dir = (A1 - A0) <= (B1 - B0) and Long or -Long
 			for _, D in ipairs(M:GetDescendants()) do
 				local N = D.Name:lower()
-				if (D:IsA("BasePart") or D:IsA("Attachment")) and (N:find("muzzle") or N:find("barrel") or N:find("firepoint") or N:find("shoot") or N:find("flash")) then
-					Tip = D:IsA("Attachment") and D.WorldPosition or D.Position
+				if (D:IsA("BasePart") or D:IsA("Attachment")) and (N:find("muzzle") or N:find("barrel") or N:find("firepoint") or N:find("flash")) then
+					local T = D:IsA("Attachment") and D.WorldPosition or D.Position
+					Dir = (T - Mid):Dot(Long) >= 0 and Long or -Long
 					break
 				end
 			end
-			if not Tip then
-				local A0, A1, B0, B1 = math.huge, -math.huge, math.huge, -math.huge
-				for _, Pt in ipairs(Pts) do
-					if (Pt - self.Center):Dot(Axis) >= 0 then A0, A1 = math.min(A0, Pt.Y), math.max(A1, Pt.Y)
-					else B0, B1 = math.min(B0, Pt.Y), math.max(B1, Pt.Y) end
-				end
-				Tip = (A1 - A0) <= (B1 - B0) and (self.Center + Axis) or (self.Center - Axis)
-			end
-			local Dir = (Tip - self.Center):Dot(Axis) >= 0 and Axis or -Axis
-			local Look = Dir:Cross(v3(0, 1, 0))
-			self.Yaw, self.Pitch = math.deg(math.atan2(-Look.X, -Look.Z)), 10
-			self.Dist = self.Size * 0.5 / math.tan(math.rad(Cam.FieldOfView / 2)) * 1.15
-			self:Place()
+			local Center = Mid + Long * ((L0 + L1) / 2) + Up * ((U0 + U1) / 2)
+			local Len, Hgt = L1 - L0, U1 - U0
+			local Half = math.tan(math.rad(Cam.FieldOfView / 2))
+			local Dist = math.max(Len / 1.2, Hgt) * 0.5 / Half * 1.3
+			Cam.CFrame = CFrame.fromMatrix(Center, -Dir, Up) * CFrame.Angles(0, math.rad(28), 0) * CFrame.Angles(math.rad(-14), 0, 0) * CFrame.new(0, 0, Dist)
+			self.Center, self.Size = Center, math.max(Len, 0.5)
 		end
 		O:Place()
 		O.LastDrag = 0
@@ -5022,6 +5029,10 @@ local Char = (function()
 						end
 					end
 				end
+			end)
+			pcall(function()
+				local R = M:FindFirstChild("LowerTorso") or M:FindFirstChild("Torso")
+				if R then M.WorldPivot = CFrame.new(R.Position) end
 			end)
 			M.Parent = World
 			local Ok = pcall(function() M:PivotTo(CFrame.new()) end)
