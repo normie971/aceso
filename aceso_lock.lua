@@ -10,14 +10,19 @@ local cfg = {
     enabled = true,
 
     camlock = {
-        smoothX = 0.15,
-        smoothY = 0.19,
-        predX   = 0.07,
-        predY   = 0.13,
+        smoothX = 0.05,
+        smoothY = 0.05,
+        predX   = 0.08,
+        predY   = 0.16,
     },
 
     silent = {
         prediction = 0.119,
+    },
+
+    rapidFire = {
+        enabled = true,
+        delay   = 0.05,
     },
 
     filter = {
@@ -32,8 +37,9 @@ local cfg = {
 }
 
 local state = {
-    target = nil,
-    locked = false,
+    target  = nil,
+    locked  = false,
+    holding = false,
 }
 
 local function isAlive(char)
@@ -79,6 +85,34 @@ local function getClosest()
     end
 
     return bestHead
+end
+
+local function fireOnce()
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then return end
+
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool then
+        pcall(function()
+            tool:Activate()
+        end)
+        return
+    end
+
+    if typeof(mouse1click) == "function" then
+        pcall(mouse1click)
+        return
+    end
+
+    local mouse = LocalPlayer:GetMouse()
+    pcall(function()
+        local vim = game:GetService("VirtualInputManager")
+        vim:SendMouseButtonEvent(mouse.X, mouse.Y, 0, true, game, 1)
+        vim:SendMouseButtonEvent(mouse.X, mouse.Y, 0, false, game, 1)
+    end)
 end
 
 if typeof(hookmetamethod) == "function" then
@@ -156,12 +190,33 @@ RunService.RenderStepped:Connect(function()
 end)
 
 UIS.InputBegan:Connect(function(inp, gp)
+    if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+        if cfg.rapidFire.enabled and not state.holding then
+            state.holding = true
+
+            task.spawn(function()
+                while state.holding
+                    and cfg.enabled
+                    and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+                do
+                    fireOnce()
+                    task.wait(cfg.rapidFire.delay)
+                end
+
+                state.holding = false
+            end)
+        end
+
+        return
+    end
+
     if gp then return end
 
     if inp.KeyCode == cfg.keys.killSwitch then
         cfg.enabled = not cfg.enabled
         state.target = nil
         state.locked = false
+        state.holding = false
 
     elseif inp.KeyCode == cfg.keys.lock then
         if state.locked then
@@ -173,4 +228,9 @@ UIS.InputBegan:Connect(function(inp, gp)
         end
     end
 end)
-print("[aceso, C for lock]")
+
+UIS.InputEnded:Connect(function(inp)
+    if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+        state.holding = false
+    end
+end)
