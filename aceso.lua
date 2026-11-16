@@ -3518,12 +3518,14 @@ local Skins = (function()
 		end
 		function O:Frame(M)
 			local Lo, Hi
+			local Pts = {}
 			for _, D in ipairs(M:GetDescendants()) do
 				if D:IsA("BasePart") and D.Transparency < 0.95 and D.Size.Magnitude < 12 then
 					local H = D.Size / 2
 					local C0 = D.CFrame
 					for _, X in ipairs({ -1, 1 }) do for _, Y in ipairs({ -1, 1 }) do for _, Z in ipairs({ -1, 1 }) do
 						local Pt = C0:PointToWorldSpace(v3(H.X * X, H.Y * Y, H.Z * Z))
+						Pts[#Pts + 1] = Pt
 						Lo = Lo and v3(math.min(Lo.X, Pt.X), math.min(Lo.Y, Pt.Y), math.min(Lo.Z, Pt.Z)) or Pt
 						Hi = Hi and v3(math.max(Hi.X, Pt.X), math.max(Hi.Y, Pt.Y), math.max(Hi.Z, Pt.Z)) or Pt
 					end end end
@@ -3543,11 +3545,15 @@ local Skins = (function()
 				end
 			end
 			if not Tip then
-				local H = M:FindFirstChild("Handle", true)
-				Tip = H and H:IsA("BasePart") and (self.Center * 2 - H.Position) or (self.Center + Axis)
+				local A0, A1, B0, B1 = math.huge, -math.huge, math.huge, -math.huge
+				for _, Pt in ipairs(Pts) do
+					if (Pt - self.Center):Dot(Axis) >= 0 then A0, A1 = math.min(A0, Pt.Y), math.max(A1, Pt.Y)
+					else B0, B1 = math.min(B0, Pt.Y), math.max(B1, Pt.Y) end
+				end
+				Tip = (A1 - A0) <= (B1 - B0) and (self.Center + Axis) or (self.Center - Axis)
 			end
 			local Dir = (Tip - self.Center):Dot(Axis) >= 0 and Axis or -Axis
-			local Look = v3(0, 1, 0):Cross(Dir)
+			local Look = Dir:Cross(v3(0, 1, 0))
 			self.Yaw, self.Pitch = math.deg(math.atan2(-Look.X, -Look.Z)), 10
 			self.Dist = self.Size * 0.5 / math.tan(math.rad(Cam.FieldOfView / 2)) * 1.15
 			self:Place()
@@ -4996,8 +5002,9 @@ local Char = (function()
 			local Hum = M:FindFirstChildOfClass("Humanoid")
 			if Hum then Hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None end
 			pcall(function()
-				local Root = M:FindFirstChild("HumanoidRootPart")
+				local Root = M:FindFirstChild("LowerTorso") or M:FindFirstChild("Torso") or M:FindFirstChild("HumanoidRootPart")
 				if not Root then return end
+				Root.CFrame = CFrame.new(Root.Position)
 				local Joints = {}
 				for _, J in ipairs(M:GetDescendants()) do
 					if J:IsA("JointInstance") and J.Part0 and J.Part1 then Joints[#Joints + 1] = J end
