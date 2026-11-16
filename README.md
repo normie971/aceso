@@ -1,6 +1,6 @@
 # aceso
 
-visuals
+visuals (not finished)
 ```
 loadstring(game:HttpGet("https://raw.githubusercontent.com/normie971/aceso/main/aceso.lua"))()
 ```
