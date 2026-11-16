@@ -11,7 +11,7 @@ local cfg = {
 
     camlock = {
         smoothX = 0.10,
-        smoothY = 0.03,
+        smoothY = 0.17,
         predX   = 0.12,
         predY   = 0.10,
     },
@@ -81,7 +81,6 @@ local function getClosest()
     return bestHead
 end
 
--- Hood Customs silent aim: redirect Mouse.Hit / Mouse.Target
 if typeof(hookmetamethod) == "function" then
     local oldIndex
 
