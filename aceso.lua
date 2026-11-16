@@ -3458,10 +3458,22 @@ local Skins = (function()
 	local Uid = 0
 	local function F(N) Uid = Uid + 1; return "__sk_" .. N .. Uid end
 	local function Sec(Col, Name) return Library.MakeSection(Col, { Name = Name }) end
+	local function GripFor(Weapon, Src)
+		if Src and Src:IsA("Tool") then return Src.Grip end
+		local Roots = { lp:FindFirstChildOfClass("Backpack"), lp.Character, ReplicatedStorage, game:GetService("StarterPack") }
+		for _, P in ipairs(Players:GetPlayers()) do Roots[#Roots + 1] = P.Character end
+		for _, R in pairs(Roots) do
+			for _, N in ipairs({ "[" .. Weapon .. "]", Weapon }) do
+				local T = R and R:FindFirstChild(N, true)
+				if T and T:IsA("Tool") then return T.Grip end
+			end
+		end
+	end
 	local function CloneFor(Weapon)
 		local Src, IsWrap = SourceFor(Weapon)
 		if not Src then return nil end
 		local M = Instance.new("Model")
+		pcall(function() local G = GripFor(Weapon, Src); if G then M:SetAttribute("Grip", G) end end)
 		if Src:IsA("Tool") or (Src:IsA("Model") and Src:FindFirstChild("Handle")) then
 			for _, C in ipairs(Src:GetChildren()) do
 				if not C:IsA("LuaSourceContainer") and not C:IsA("Sound") then pcall(function() C:Clone().Parent = M end) end
@@ -3534,36 +3546,42 @@ local Skins = (function()
 				self:Place()
 				return
 			end
-			local Ax = { { Big.CFrame.RightVector, Big.Size.X }, { Big.CFrame.UpVector, Big.Size.Y }, { Big.CFrame.ZVector, Big.Size.Z } }
-			table.sort(Ax, function(A, B) return A[2] > B[2] end)
-			local Long = Ax[1][1]
-			local Up = math.abs(Ax[2][1]:Dot(v3(0, 1, 0))) >= math.abs(Ax[3][1]:Dot(v3(0, 1, 0))) and Ax[2][1] or Ax[3][1]
-			if Up:Dot(v3(0, 1, 0)) < 0 then Up = -Up end
 			local Mid = v3()
 			for _, P in ipairs(Pts) do Mid = Mid + P end
 			Mid = Mid / #Pts
-			local L0, L1, U0, U1 = math.huge, -math.huge, math.huge, -math.huge
-			local A0, A1, B0, B1 = math.huge, -math.huge, math.huge, -math.huge
-			for _, P in ipairs(Pts) do
-				local S, Y = (P - Mid):Dot(Long), (P - Mid):Dot(Up)
-				L0, L1, U0, U1 = math.min(L0, S), math.max(L1, S), math.min(U0, Y), math.max(U1, Y)
-				if S >= 0 then A0, A1 = math.min(A0, Y), math.max(A1, Y) else B0, B1 = math.min(B0, Y), math.max(B1, Y) end
-			end
-			local Dir = (A1 - A0) <= (B1 - B0) and Long or -Long
-			for _, D in ipairs(M:GetDescendants()) do
-				local N = D.Name:lower()
-				if (D:IsA("BasePart") or D:IsA("Attachment")) and (N:find("muzzle") or N:find("barrel") or N:find("firepoint") or N:find("flash")) then
-					local T = D:IsA("Attachment") and D.WorldPosition or D.Position
-					Dir = (T - Mid):Dot(Long) >= 0 and Long or -Long
-					break
+			local Dir, Up
+			local Grip, Handle = M:GetAttribute("Grip"), M:FindFirstChild("Handle", true)
+			if typeof(Grip) == "CFrame" and Handle and Handle:IsA("BasePart") then
+				Dir = Handle.CFrame:VectorToWorldSpace(Grip.LookVector)
+				Up = Handle.CFrame:VectorToWorldSpace(Grip.UpVector)
+			else
+				local Ax = { { Big.CFrame.RightVector, Big.Size.X }, { Big.CFrame.UpVector, Big.Size.Y }, { Big.CFrame.ZVector, Big.Size.Z } }
+				table.sort(Ax, function(A, B) return A[2] > B[2] end)
+				local Long = Ax[1][1]
+				Up = math.abs(Ax[2][1]:Dot(v3(0, 1, 0))) >= math.abs(Ax[3][1]:Dot(v3(0, 1, 0))) and Ax[2][1] or Ax[3][1]
+				if Up:Dot(v3(0, 1, 0)) < 0 then Up = -Up end
+				local A0, A1, B0, B1 = math.huge, -math.huge, math.huge, -math.huge
+				for _, P in ipairs(Pts) do
+					local S, Y = (P - Mid):Dot(Long), (P - Mid):Dot(Up)
+					if S >= 0 then A0, A1 = math.min(A0, Y), math.max(A1, Y) else B0, B1 = math.min(B0, Y), math.max(B1, Y) end
 				end
+				Dir = (A1 - A0) <= (B1 - B0) and Long or -Long
 			end
-			local Center = Mid + Long * ((L0 + L1) / 2) + Up * ((U0 + U1) / 2)
-			local Len, Hgt = L1 - L0, U1 - U0
+			local Side = Dir:Cross(Up).Unit
+			Dir = Dir.Unit
+			Up = Side:Cross(Dir).Unit
+			local L0, L1, U0, U1, S0, S1 = math.huge, -math.huge, math.huge, -math.huge, math.huge, -math.huge
+			for _, P in ipairs(Pts) do
+				local R = P - Mid
+				local A, B, C = R:Dot(Dir), R:Dot(Up), R:Dot(Side)
+				L0, L1, U0, U1, S0, S1 = math.min(L0, A), math.max(L1, A), math.min(U0, B), math.max(U1, B), math.min(S0, C), math.max(S1, C)
+			end
+			local Center = Mid + Dir * ((L0 + L1) / 2) + Up * ((U0 + U1) / 2) + Side * ((S0 + S1) / 2)
+			local Len = math.max(L1 - L0, U1 - U0, 0.5)
 			local Half = math.tan(math.rad(Cam.FieldOfView / 2))
-			local Dist = math.max(Len / 1.2, Hgt) * 0.5 / Half * 1.3
-			Cam.CFrame = CFrame.fromMatrix(Center, -Dir, Up) * CFrame.Angles(0, math.rad(28), 0) * CFrame.Angles(math.rad(-14), 0, 0) * CFrame.new(0, 0, Dist)
-			self.Center, self.Size = Center, math.max(Len, 0.5)
+			local Dist = Len * 0.47 / Half
+			Cam.CFrame = CFrame.fromMatrix(Center, Dir, Up) * CFrame.Angles(0, math.rad(-22), 0) * CFrame.Angles(math.rad(-10), 0, 0) * CFrame.Angles(0, 0, math.rad(-35)) * CFrame.new(0, 0, Dist)
+			self.Center, self.Size = Center, Len
 		end
 		O:Place()
 		O.LastDrag = 0
