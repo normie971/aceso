@@ -3491,6 +3491,7 @@ local Skins = (function()
 		if not Src then return nil end
 		local M = Instance.new("Model")
 		if Disp then M:SetAttribute("Display", true) end
+		if Weapon == "Knife" then M:SetAttribute("Knife", true) end
 		pcall(function() local G = GripFor(Weapon, Src); if G then M:SetAttribute("Grip", G) end end)
 		if Src:IsA("Tool") or (Src:IsA("Model") and Src:FindFirstChild("Handle")) then
 			for _, C in ipairs(Src:GetChildren()) do
@@ -3551,10 +3552,20 @@ local Skins = (function()
 				local P = M:FindFirstChild("Handle", true)
 				if not (P and P:IsA("BasePart")) then P = M:FindFirstChildWhichIsA("BasePart", true) end
 				if P then
-					Cam.FieldOfView = 70
 					local Pos = P.CFrame.Position
-					Cam.CFrame = CFrame.new(Pos + v3(1.25, 1.25, 1.25) * P.Size.Magnitude * 0.4, Pos)
-					self.Center, self.Size = Pos, P.Size.Magnitude
+					local Game = CFrame.new(Pos + v3(1.25, 1.25, 1.25) * P.Size.Magnitude * 0.4, Pos)
+					local Ax = { { P.CFrame.RightVector, P.Size.X }, { P.CFrame.UpVector, P.Size.Y }, { P.CFrame.ZVector, P.Size.Z } }
+					table.sort(Ax, function(A, B) return A[2] > B[2] end)
+					local Dir, Up = Ax[1][1], Ax[2][1]
+					if Dir:Dot(Game.RightVector) < 0 then Dir = -Dir end
+					if M:GetAttribute("Knife") then Dir = -Dir end
+					if Up:Dot(Game.UpVector) < 0 then Up = -Up end
+					local Len = Ax[1][2]
+					Cam.FieldOfView = 20
+					local Dist = Len * 0.5 / math.tan(math.rad(10)) * 1.25
+					local Tilt = M:GetAttribute("Knife") and 55 or 35
+					Cam.CFrame = CFrame.fromMatrix(Pos, Dir, Up) * CFrame.Angles(0, 0, math.rad(-Tilt)) * CFrame.new(0, 0, Dist)
+					self.Center, self.Size = Pos, Len
 					return
 				end
 			end
