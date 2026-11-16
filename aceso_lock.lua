@@ -10,10 +10,10 @@ local cfg = {
     enabled = true,
 
     camlock = {
-        smoothX = 0.10,
+        smoothX = 0.15,
         smoothY = 0.17,
-        predX   = 0.12,
-        predY   = 0.10,
+        predX   = 0.07,
+        predY   = 0.13,
     },
 
     silent = {
