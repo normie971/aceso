@@ -11,7 +11,7 @@ local cfg = {
 
     camlock = {
         smoothX = 0.15,
-        smoothY = 0.17,
+        smoothY = 0.19,
         predX   = 0.07,
         predY   = 0.13,
     },
